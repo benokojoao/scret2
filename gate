@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Painel Protegido</title>
+  <style>
+    /* Estilo meio hacker / terminal, porém limpo */
+    body{
+      margin:0;
+      height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: radial-gradient(circle at 20% 10%, #071016 0%, #000000 40%);
+      font-family: 'Courier New', monospace;
+      color:#33ff66;
+    }
+    .box{
+      width:420px;
+      max-width:94%;
+      background:rgba(0,0,0,0.75);
+      border:1px solid rgba(51,255,102,0.06);
+      padding:22px;
+      border-radius:8px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+      text-align:center;
+    }
+    h2{ margin:0 0 12px 0; color:#9fffae; letter-spacing:1px; }
+    p.small{ color:#7ef2a6; margin:0 0 18px 0; font-size:14px; }
+    input[type="password"]{
+      width:100%;
+      padding:12px 10px;
+      background:#00110a;
+      color:#bfffd6;
+      border:1px solid rgba(51,255,102,0.08);
+      border-radius:6px;
+      font-size:16px;
+      box-sizing:border-box;
+      outline:none;
+      margin-bottom:12px;
+    }
+    .row{ display:flex; gap:8px; }
+    button{
+      padding:10px 12px;
+      border-radius:6px;
+      border:none;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn-ok{ background:#0b6; color:#002; flex:1; }
+    .btn-cancel{ background:transparent; color:#7ef2a6; border:1px solid rgba(126,242,166,0.08); flex:1; }
+    .hint{ font-size:12px; color:#4bd67a; margin-top:10px; opacity:0.9; }
+    .err{ color:#ff6b6b; margin-top:10px; display:none; }
+    .status{ font-size:13px; margin-top:10px; color:#9fffae; display:none; }
+  </style>
+</head>
+<body>
+  <div class="box" role="main">
+    <h2>ACESSO RESTRITO</h2>
+    <p class="small">Digite a senha para acessar o painel.</p>
+
+    <input id="pwd" type="password" placeholder="senha">
+    <div class="row">
+      <button id="enterBtn" class="btn-ok">Entrar</button>
+      <button id="backBtn" class="btn-cancel">Voltar</button>
+    </div>
+
+    <div id="err" class="err">Senha incorreta.</div>
+    <div id="status" class="status">Processando e enviando eventos...</div>
+    <div class="hint">Proteção simples (cliente). Para segurança real, use autenticação por servidor.</div>
+  </div>
+
+  <script>
+    // senha em texto plano (cliente) conforme solicitado
+    const CORRECT = 'hacker123';
+
+    // URL para onde redirecionar o usuário (painel hacker)
+    const REDIRECT_URL = 'http://localhost:63342/site%20secreto/hacker.html?_ijt=ct546qobra3od32e123dra8ops&_ij_reload=RELOAD_ON_SAVE';
+
+    const enterBtn = document.getElementById('enterBtn');
+    const backBtn = document.getElementById('backBtn');
+    const pwd = document.getElementById('pwd');
+    const err = document.getElementById('err');
+    const statusEl = document.getElementById('status');
+
+    // chave usada no index.html para eventos (mantida compatibilidade)
+    const KEY_EVENTS = 'timelineEvents';
+    const KEY_OUTGOING = 'outgoingEvents';
+
+    function showError(msg){
+      err.textContent = msg || 'Senha incorreta.';
+      err.style.display = 'block';
+    }
+
+    function hideError(){
+      err.style.display = 'none';
+    }
+
+    function showStatus(msg){
+      statusEl.textContent = msg;
+      statusEl.style.display = 'block';
+    }
+
+    function hideStatus(){
+      statusEl.style.display = 'none';
+    }
+
+    // Função que "envia" (na prática: copia para outgoingEvents e marca status)
+    function transferEventsToOutgoing(){
+      // lê eventos existentes
+      const events = JSON.parse(localStorage.getItem(KEY_EVENTS) || '[]');
+
+      if (!events.length) {
+        // nada pra enviar — retorna vazio
+        return 0;
+      }
+
+      // opcional: marcar cada evento como "sent" (ou "approved")
+      const prepared = events.map(ev => {
+        // preserve existing props, atualiza remoteStatus
+        return Object.assign({}, ev, { remoteStatus: 'sent' });
+      });
+
+      // mesclar com outgoingEvents já existentes (evita duplicatas por date+title)
+      const existing = JSON.parse(localStorage.getItem(KEY_OUTGOING) || '[]');
+      const merged = existing.slice(); // copia
+
+      // adiciona somente se não existir (por date + title)
+      prepared.forEach(p => {
+        const exists = merged.some(m => m.date === p.date && m.title === p.title);
+        if (!exists) merged.push(p);
+      });
+
+      localStorage.setItem(KEY_OUTGOING, JSON.stringify(merged));
+      // também atualiza outgoingEvents usado pelo hacker.html (caso ele leia essa chave)
+      localStorage.setItem('outgoingEvents', JSON.stringify(merged));
+
+      return prepared.length;
+    }
+
+    enterBtn.addEventListener('click', () => {
+      hideError();
+      hideStatus();
+      const val = pwd.value || '';
+
+      if (val === CORRECT) {
+        // sucesso: transferir eventos e redirecionar
+        showStatus('Transferindo eventos para o painel e redirecionando...');
+        try {
+          const count = transferEventsToOutgoing();
+          // opcional: também podemos limpar timelineEvents se quiser:
+          // localStorage.removeItem(KEY_EVENTS);
+          // dar um pequeno delay para garantir gravação no storage antes do redirect
+          setTimeout(() => {
+            // redireciona para o painel hacker
+            window.location.href = REDIRECT_URL;
+          }, 300);
+        } catch (e) {
+          console.error('Erro ao transferir eventos:', e);
+          showError('Erro interno ao processar eventos.');
+        }
+      } else {
+        showError('Senha incorreta.');
+        pwd.value = '';
+        pwd.focus();
+      }
+    });
+
+    // permitir Enter no campo
+    pwd.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter') enterBtn.click();
+    });
+
+    backBtn.addEventListener('click', ()=>{
+      if (document.referrer) {
+        window.location.href = document.referrer;
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+  </script>
+</body>
+</html>
