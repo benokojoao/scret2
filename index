@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Minha Linha do Tempo</title>
+  <style>
+    :root{
+      --bg:#0f0f10;
+      --card:#1a1a1d;
+      --accent:#00b3ff;
+      --muted:#bfc7cf;
+    }
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:linear-gradient(180deg,#070708 0%, var(--bg) 100%);
+      color:var(--muted);
+      display:flex;
+      gap:30px;
+      padding:40px;
+      justify-content:center;
+      align-items:flex-start;
+      min-height:100vh;
+    }
+    .container{ width:720px; max-width:95%; }
+    h1{ color:#fff; margin:0 0 18px 0; }
+    .controls{
+      background:var(--card);
+      padding:18px;
+      border-radius:10px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.6);
+      margin-bottom:18px;
+    }
+    .row{ display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+    input[type="text"], textarea {
+      width:100%;
+      padding:10px 12px;
+      background: #0f1112;
+      border:1px solid rgba(255,255,255,0.03);
+      color:var(--muted);
+      border-radius:8px;
+      outline:none;
+      box-sizing:border-box;
+    }
+    textarea{ min-height:86px; resize:vertical; }
+    .btn {
+      background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600;
+      box-shadow: 0 6px 18px rgba(0,179,255,0.08);
+    }
+    .danger{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:#ff8a80; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    .timeline{ display:flex; flex-direction:column; gap:12px; margin-top:10px; }
+    .event{ background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-left:4px solid var(--accent); padding:14px; border-radius:8px; color:var(--muted); box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+    .event-title{ color:#fff; font-weight:700; margin-bottom:6px; }
+    .event-date{ color:var(--accent); font-size:0.9rem; margin-bottom:10px; }
+    .controls-bottom{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+    a.no-decor { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Minha Linha do Tempo</h1>
+
+    <div class="controls">
+      <div class="row">
+        <input id="title" type="text" placeholder="Título do momento (ex: Consegui meu primeiro emprego)">
+      </div>
+
+      <div class="row">
+        <textarea id="desc" placeholder="Descreva o que aconteceu..."></textarea>
+      </div>
+
+      <div class="controls-bottom">
+        <button id="addBtn" class="btn">Adicionar Momento</button>
+        <button id="clearLocal" class="danger">Apagar tudo (local)</button>
+        <button id="clearOutgoing" class="danger">Limpar fila de envio</button>
+
+        <!-- Botão Secret -->
+        <a class="no-decor" href="http://localhost:63342/site%20secreto/gate.html?_ijt=suo1kur2b3geqsg3lpcs44g9r9&_ij_reload=RELOAD_ON_SAVE" target="_self">
+          <button class="btn" style="background:#222; color:#9ff; border:1px solid rgba(0,179,255,0.08)">Secret</button>
+        </a>
+      </div>
+    </div>
+
+    <div id="timeline" class="timeline"></div>
+  </div>
+
+  <script>
+    const KEY_EVENTS = 'timelineEvents';
+    const KEY_OUTGOING = 'outgoingEvents';
+
+    const titleEl = document.getElementById('title');
+    const descEl = document.getElementById('desc');
+    const addBtn = document.getElementById('addBtn');
+    const timelineEl = document.getElementById('timeline');
+    const clearLocal = document.getElementById('clearLocal');
+    const clearOutgoing = document.getElementById('clearOutgoing');
+
+    // carregar e exibir eventos
+    function loadEvents(){
+      const saved = JSON.parse(localStorage.getItem(KEY_EVENTS) || '[]');
+      timelineEl.innerHTML = '';
+      // mostra do mais novo pro mais antigo
+      saved.slice().reverse().forEach(renderEvent);
+    }
+
+    function renderEvent(ev){
+      const box = document.createElement('div');
+      box.className = 'event';
+      const dateEl = document.createElement('div');
+      dateEl.className = 'event-date';
+      dateEl.textContent = ev.date;
+      const title = document.createElement('div');
+      title.className = 'event-title';
+      title.textContent = ev.title;
+      const text = document.createElement('div');
+      text.className = 'event-text';
+      text.textContent = ev.text || '';
+      box.appendChild(dateEl);
+      box.appendChild(title);
+      box.appendChild(text);
+      timelineEl.appendChild(box);
+    }
+
+    // salvar evento em timelineEvents
+    function saveLocalEvent(ev){
+      const arr = JSON.parse(localStorage.getItem(KEY_EVENTS) || '[]');
+      arr.push(ev);
+      localStorage.setItem(KEY_EVENTS, JSON.stringify(arr));
+    }
+
+    // também guarda em outgoingEvents para que hacker.html/gate.html possam ler
+    function saveToOutgoing(ev){
+      const arr = JSON.parse(localStorage.getItem(KEY_OUTGOING) || '[]');
+      // evita duplicata por date+title
+      const exists = arr.some(x => x.date === ev.date && x.title === ev.title);
+      if (!exists) {
+        arr.push(Object.assign({}, ev));
+        localStorage.setItem(KEY_OUTGOING, JSON.stringify(arr));
+        // manter também a chave 'outgoingEvents' compatível com versões anteriores
+        localStorage.setItem('outgoingEvents', JSON.stringify(arr));
+      }
+    }
+
+    addBtn.addEventListener('click', ()=>{
+      const title = titleEl.value.trim();
+      const text = descEl.value.trim();
+      if (!title) { alert('Digite um título!'); return; }
+
+      const now = new Date();
+      const date = now.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+      const ev = { title, text, date, remoteStatus: 'local' };
+
+      saveLocalEvent(ev);
+      saveToOutgoing(ev);
+      loadEvents();
+
+      titleEl.value = '';
+      descEl.value = '';
+    });
+
+    clearLocal.addEventListener('click', ()=>{
+      if (!confirm('Apagar todos os eventos salvos localmente?')) return;
+      localStorage.removeItem(KEY_EVENTS);
+      loadEvents();
+    });
+
+    clearOutgoing.addEventListener('click', ()=>{
+      if (!confirm('Limpar a fila de envio (apenas dados locais)?')) return;
+      localStorage.removeItem(KEY_OUTGOING);
+      localStorage.removeItem('outgoingEvents');
+      loadEvents();
+    });
+
+    // inicializa
+    loadEvents();
+  </script>
+</body>
+</html>
